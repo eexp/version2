@@ -50,7 +50,7 @@ const char *OTAName = "ESP8266";     // A name and a password for the OTA servic
 const char *OTAPassword = "esp8266";
 const int chipSelect = D4;   //SD CARD  OLD Version = D8    
 
-int brojStranice = 9;
+int brojStranice = 3;
 Ticker timer;
 
 #define LED 2  //On board LED
@@ -95,15 +95,15 @@ void initPages()
   webPages[3].type                    = HTTP_POST;
   webPages[3].http_function           = []() {server.send(200, "text/plain", "");};
   webPages[3].function                = NULL;
-  webPages[3].webSocketEventFunction  = NULL;
+  webPages[3].webSocketEventFunction  = webSocketEvent3;
   
-  webPages[4].link                    = "/exp1";
+  webPages[4].link                    = "/activatedexp";  
   webPages[4].type                    = -1; //
   webPages[4].http_function           = NULL;
-  webPages[4].function                = exp1_function;
+  webPages[4].function                = activatedexp_function;
   webPages[4].webSocketEventFunction  = NULL;
   
-  webPages[5].link                    = "/readADC";
+  webPages[5].link                    = "/readADC"; //empty 
   webPages[5].type                    = -1;
   webPages[5].http_function           = NULL;
   webPages[5].function                = handleADC;
@@ -113,15 +113,15 @@ void initPages()
   webPages[6].type                    = HTTP_POST;
   webPages[6].http_function           = []() {server.send(200, "text/plain", "");};
   webPages[6].function                = NULL;
-  webPages[6].webSocketEventFunction  = NULL;
+  webPages[6].webSocketEventFunction  = NULL;// webSocketEvent6;
   
-  webPages[7].link                    = "/exp2";
+  webPages[7].link                    = "/exp2"; //soon obsolete
   webPages[7].type                    = -1;
   webPages[7].http_function           = NULL;
   webPages[7].function                = exp2_function;
   webPages[7].webSocketEventFunction  = NULL;
   
-  webPages[8].link                    = "/readBAR";
+  webPages[8].link                    = "/readBAR"; //soon obsolete
   webPages[8].type                    = -1;
   webPages[8].http_function           = NULL;
   webPages[8].function                = handleBAR;
@@ -134,9 +134,9 @@ void initPages()
   webPages[9].webSocketEventFunction  = webSocketEvent9;
 }
 
-///////////////////////////////////////////////////////
-//                       Page 0 --- habdle upload file
-///////////////////////////////////////////////////////
+////////////////////////////////////////////////////////
+//                       Page 0 --- handle upload file// DONE
+////////////////////////////////////////////////////////
 void handleFileUpload() { // upload a new file to the SPIFFS
   HTTPUpload& upload = server.upload();
   String path;
@@ -197,9 +197,9 @@ bool handleFileRead(String path) { // send the right file to the client (if it e
 }
 
 
-///////////////////////////////////////////////////////
-//                       Page 2 --- WiFi connections
-///////////////////////////////////////////////////////
+////////////////////////////////////////////////////////
+//                       Page 2 --- WiFi connections  //
+////////////////////////////////////////////////////////
 void handleLogin() {                         // If a POST request is made to URI /login
   if( ! server.hasArg("NAME") || ! server.hasArg("PASSWORD") 
       || server.arg("NAME") == NULL || server.arg("PASSWORD") == NULL) { // If the POST request doesn't have username and password data
@@ -224,28 +224,52 @@ void handleLogin() {                         // If a POST request is made to URI
     myFile.close();
   }
 }
-
 ///////////////////////////////////////////////////////
-//                       Page 4 ---- Experiment 1
+//                       Page 3 ---- Analog reading
 ///////////////////////////////////////////////////////
-void exp1_function(){
+void webSocketEvent3(uint8_t num, WStype_t type, uint8_t * payload, size_t length){
+  if(type == WStype_TEXT){
     display.clear();
-    display.drawString(0, 0,"Experiment 1 Started");
-    display.drawString(0, 14,"Reading Analog Values");
+    display.drawString(0, 0,"Web Sockets Started A0" );
+    display.drawString(0, 13,"with data rate" );
+
+    float dataRate = (float) atof((const char *) &payload[0]);
+    timer.detach();
+    if (dataRate!=0) {timer.attach(dataRate, getData3);}
+    
+    display.drawString(0, 26,String(dataRate));
     display.display();
-    Serial.println("Experiment 1 Started \n>-----");
-    bool indicateIPadress = false;
+    }
+}
+
+void getData3() {
+  String json = "{\"value\":";
+  json += analogRead(A0);
+  json += "}";
+  Serial.println(json);
+  webSocket.broadcastTXT(json.c_str(), json.length());
 }
 
 ///////////////////////////////////////////////////////
-//                       Page 5 ---- Analog sensor
+//                       Page 4 ---- activatedexp_function
+///////////////////////////////////////////////////////
+void activatedexp_function(){
+  String NAME = server.arg(0);
+  Serial.println(NAME);
+    display.clear();
+    display.drawString(0, 0,"Experiment "+NAME+" started");
+    display.drawString(0, 14,"Have Fun!");
+    display.display();
+    Serial.println("Experiment "+NAME+" started");
+    brojStranice = NAME.toInt(); 
+}
+
+///////////////////////////////////////////////////////
+//                       Page 5 
 ///////////////////////////////////////////////////////
 void handleADC() 
 {
- int a = analogRead(A0);
- String adcValue = String(a);
- server.send(200, "text/plain", adcValue); //Send ADC value only to client ajax request
- //Serial.println("Analog data: " + adcValue);
+ 
 }
 
 ///////////////////////////////////////////////////////
@@ -278,7 +302,6 @@ void handleBAR() {
 //                       Page 9 
 ///////////////////////////////////////////////////////
 void webSocketEvent9(uint8_t num, WStype_t type, uint8_t * payload, size_t length){
-  
   if(type == WStype_TEXT){
     display.clear();
     display.drawString(0, 0,"Web Sockets Started" );
@@ -287,11 +310,20 @@ void webSocketEvent9(uint8_t num, WStype_t type, uint8_t * payload, size_t lengt
     
     float dataRate = (float) atof((const char *) &payload[0]);
     timer.detach();
-    timer.attach(dataRate, getData);
-    
+    if (dataRate!=0) {timer.attach(dataRate, getData9);}
+
     display.drawString(0, 26,String(dataRate));
     display.display();
     }
+}
+
+void getData9() {
+//  Serial.println(bmp.readTemperature());
+  String json = "{\"value\":";
+  json += bme.readTemperature();
+  json += "}";
+  Serial.println(json);
+  webSocket.broadcastTXT(json.c_str(), json.length());
 }
 
 ///////////////////////////////////////////////////////
@@ -335,17 +367,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
   webPages[brojStranice].webSocketEventFunction(num, type, payload, length);
 }
 
-
-
-
-void getData() {
-//  Serial.println(bmp.readTemperature());
-  String json = "{\"value\":";
-  json += bme.readTemperature();
-  json += "}";
-  Serial.println(json);
-  webSocket.broadcastTXT(json.c_str(), json.length());
-}
 
 void init_display()
 {
@@ -407,8 +428,6 @@ void setup() {
   init_OneWire();
   
   server.begin(); 
-  webSocket.begin();
-  webSocket.onEvent(webSocketEvent);
   bme.begin();
 
   //------------ All initialized----------\/ 
@@ -428,12 +447,8 @@ void loop() {
   webSocket.loop();                           // constantly check for websocket events
   server.handleClient();                      // run the server
   //ArduinoOTA.handle();                        // listen for OTA events
-  
-  
       
 }
-
-
 
 
 /*__________________________________________________________THE REST_________________________________________________________________*/
