@@ -103,29 +103,29 @@ void initPages()
   webPages[4].function                = activatedexp_function;
   webPages[4].webSocketEventFunction  = NULL;
   
-  webPages[5].link                    = "/readADC"; //empty 
-  webPages[5].type                    = -1;
-  webPages[5].http_function           = NULL;
-  webPages[5].function                = handleADC;
-  webPages[5].webSocketEventFunction  = NULL;
+  webPages[5].link                    = "/exp3.html";
+  webPages[5].type                    = HTTP_POST;
+  webPages[5].http_function           = []() {server.send(200, "text/plain", "");};
+  webPages[5].function                = NULL;
+  webPages[5].webSocketEventFunction  = webSocketEvent5;
   
   webPages[6].link                    = "/exp2.html";
   webPages[6].type                    = HTTP_POST;
   webPages[6].http_function           = []() {server.send(200, "text/plain", "");};
   webPages[6].function                = NULL;
-  webPages[6].webSocketEventFunction  = NULL;// webSocketEvent6;
+  webPages[6].webSocketEventFunction  = webSocketEvent6;
   
-  webPages[7].link                    = "/exp2"; //soon obsolete
-  webPages[7].type                    = -1;
-  webPages[7].http_function           = NULL;
-  webPages[7].function                = exp2_function;
-  webPages[7].webSocketEventFunction  = NULL;
+  webPages[7].link                    = "/exp4.html";
+  webPages[7].type                    = HTTP_POST;
+  webPages[7].http_function           = []() {server.send(200, "text/plain", "");};
+  webPages[7].function                = NULL;
+  webPages[7].webSocketEventFunction  = webSocketEvent7;
   
-  webPages[8].link                    = "/readBAR"; //soon obsolete
-  webPages[8].type                    = -1;
-  webPages[8].http_function           = NULL;
-  webPages[8].function                = handleBAR;
-  webPages[8].webSocketEventFunction  = NULL;
+  webPages[8].link                    = "/exp5.html";
+  webPages[8].type                    = HTTP_POST;
+  webPages[8].http_function           = []() {server.send(200, "text/plain", "");};
+  webPages[8].function                = NULL;
+  webPages[8].webSocketEventFunction  = webSocketEvent8;
   
   webPages[9].link                    = "/wsfile.html";
   webPages[9].type                    = HTTP_POST;
@@ -265,41 +265,112 @@ void activatedexp_function(){
 }
 
 ///////////////////////////////////////////////////////
-//                       Page 5 
+//                       Page 5 -- exp3
 ///////////////////////////////////////////////////////
-void handleADC() 
-{
- 
-}
-
-///////////////////////////////////////////////////////
-//                       Page 7 
-///////////////////////////////////////////////////////
-void exp2_function(){
+void webSocketEvent5(uint8_t num, WStype_t type, uint8_t * payload, size_t length){
+  if(type == WStype_TEXT){
     display.clear();
-    display.drawString(0, 0,"Experiment 2 Started" );
+    display.drawString(0, 0,"Web Sockets Started A0" );
+    display.drawString(0, 13,"with data rate" );
+
+    float dataRate = (float) atof((const char *) &payload[0]);
+    timer.detach();
+    if (dataRate!=0) {timer.attach(dataRate, getData5);}
+    
+    display.drawString(0, 26,String(dataRate));
     display.display();
-    delay(50);
-    //bmp.begin(0x77);
-    bme.begin(0x76);  
+    }
+}
+
+void getData5() {
+  String json = "{\"value\":";
+  json += analogRead(A0);
+  json += "}";
+  Serial.println(json);
+  webSocket.broadcastTXT(json.c_str(), json.length());
 }
 ///////////////////////////////////////////////////////
-//                       Page 8 -- Barometric sensor
+//                       Page 6 -- Barometric reading 
 ///////////////////////////////////////////////////////
-void handleBAR() { 
- //float tempB = bmp.readTemperature();
- //float presB = bmp.readPressure();
- /// or
- float tempB = bme.readTemperature();
- float presB = bme.readPressure();
- 
- String Value = String(tempB)+","+String(presB);
- server.send(200, "text/plain", Value); //Send value only to client ajax request
- //Serial.println("Temp and Pres: " + Value);
+void webSocketEvent6(uint8_t num, WStype_t type, uint8_t * payload, size_t length){
+  if(type == WStype_TEXT){
+    display.clear();
+    display.drawString(0, 0,"Barometric readings" );
+    display.drawString(0, 13,"with data rate:" );
+    bme.begin(0x76); 
+    //bmp.begin(0x77);
+    float dataRate = (float) atof((const char *) &payload[0]);
+    timer.detach();
+    if (dataRate!=0) {timer.attach(dataRate, getData6);}
+    display.drawString(0, 26,String(dataRate));
+    display.display();
+    }
+}
+
+void getData6() {
+//  Serial.println(bmp.readTemperature());
+  String json = "{\"value\":\"";
+  json += bme.readTemperature();
+  json += ",";
+  json += bme.readPressure();
+  json += "\"}";
+  Serial.println(json);
+  webSocket.broadcastTXT(json.c_str(), json.length());
 }
 
 ///////////////////////////////////////////////////////
-//                       Page 9 
+//                       Page 7 -- exp4
+///////////////////////////////////////////////////////
+void webSocketEvent7(uint8_t num, WStype_t type, uint8_t * payload, size_t length){
+  if(type == WStype_TEXT){
+    display.clear();
+    display.drawString(0, 0,"Web Sockets Started A0" );
+    display.drawString(0, 13,"with data rate" );
+
+    float dataRate = (float) atof((const char *) &payload[0]);
+    timer.detach();
+    if (dataRate!=0) {timer.attach(dataRate, getData7);}
+    
+    display.drawString(0, 26,String(dataRate));
+    display.display();
+    }
+}
+
+void getData7() {
+  String json = "{\"value\":";
+  json += analogRead(A0);
+  json += "}";
+  Serial.println(json);
+  webSocket.broadcastTXT(json.c_str(), json.length());
+}
+///////////////////////////////////////////////////////
+//                       Page 8 -- exp5
+///////////////////////////////////////////////////////
+void webSocketEvent8(uint8_t num, WStype_t type, uint8_t * payload, size_t length){
+  if(type == WStype_TEXT){
+    display.clear();
+    display.drawString(0, 0,"Web Sockets Started A0" );
+    display.drawString(0, 13,"with data rate" );
+
+    float dataRate = (float) atof((const char *) &payload[0]);
+    timer.detach();
+    if (dataRate!=0) {timer.attach(dataRate, getData8);}
+    
+    display.drawString(0, 26,String(dataRate));
+    display.display();
+    }
+}
+
+void getData8() {
+  String json = "{\"value\":";
+  json += analogRead(A0);
+  json += "}";
+  Serial.println(json);
+  webSocket.broadcastTXT(json.c_str(), json.length());
+}
+
+///////////////////////////////////////////////////////
+//                       Page 9 -- testing new sensors
 ///////////////////////////////////////////////////////
 void webSocketEvent9(uint8_t num, WStype_t type, uint8_t * payload, size_t length){
   if(type == WStype_TEXT){
