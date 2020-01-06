@@ -25,10 +25,6 @@ h1 {letter-spacing: 5px}
 <script src="CHART.js"> </script> 
 <script id="MathJax-script" async src="MJAX.js"></script>
   <style>
-  canvas{
-    -moz-user-select: none;
-    -webkit-user-select: none;
-    -ms-user-select: none;}
 
   /* Data Table Styling */
   #dataTable {
@@ -201,29 +197,24 @@ gravitational acceleration.</li>
   </div>
 </div>
 
-<!-- Data content -->
-<div style="width:95%;">
-	<div class="chartjs-size-monitor">
-		<div class="chartjs-size-monitor-expand">
-			<div class="">
-			</div>
-		</div>
-		<div class="chartjs-size-monitor-shrink">
-			<div class="">
-			</div>
-		</div>
-	</div>
+<body onload="javascript:init()">
 
+
+
+<!------- Buttons and options---------->
+<div> 
   <div class="w3-padding-32">
-  	Select Sampling Interval: 
-    <select id="update_interval" onchange="updateRecording()">
-      <option value="1000">1s</option>
-      <option value="100">100 ms</option>
-      <option value="300">300 ms</option>
-      <option value="500">0.5 s</option>
-      <option value="2000">2 s</option>
-      <option value="10000">10 s</option>
+    Select Sampling Interval: 
+    <select id="update_interval" onchange="sendDataRate()">
+      <option value="1">1s</option>
+      <option value="0.01">10 ms</option>
+      <option value="0.05">50 ms</option>
+      <option value="0.3">300 ms</option>
+      <option value="0.5">0.5 s</option>
+      <option value="2">2 s</option>
     </select>
+    </div>
+
     <div class="w3-bar w3-border" style="font-size: 13px">
       <button onClick="startRecording()" class="w3-bar-item w3-button w3-light-grey">Start</button>
       <button onClick="stopRecording()" class="w3-bar-item w3-button">Stop</button>
@@ -231,57 +222,26 @@ gravitational acceleration.</li>
       <button class="w3-bar-item w3-button" onclick="openFullscreen()">Fullscreen</button>
     </div>
 
-    <div id="graph">
-    <canvas id="canvas" style="display: block; " width="1100" height="550" class="chartjs-render-monitor"> </canvas>
-    </div>
-    </div>
-  </div>
 
-<style>
-div.ex3 {
-  background-color: white;
-  width: 250px;
-  height: 500px;
-  overflow: scroll;
-}
-</style>
-
-<center>
-<div class="ex3 w3-center hub_specification_logo">
-  <table id="dataTable">
-    <tr><th>Time</th><th>Analog Value</th></tr>
-  </table>
 </div>
-Download the data: 
-<button onClick="downloadCSV()" class="w3-bar-item w3-button w3-hover-text-green">Download
-</button>
-</center>
-<br>
-<br>  
+<div id="graph">
+    <canvas id="canvas" 
+            style="display: block;" 
+            width="800" 
+            height="450" 
+            class="chartjs-render-monitor"> </canvas>
+</div>
 
 
+<!-- Adding a websocket to the client (webpage) -->
 <script>
-var elem = document.getElementById("graph");
-function openFullscreen() {
-  if (elem.requestFullscreen) {
-    elem.requestFullscreen();
-  } else if (elem.mozRequestFullScreen) { /* Firefox */
-    elem.mozRequestFullScreen();
-  } else if (elem.webkitRequestFullscreen) { 
-    elem.webkitRequestFullscreen();
-  } else if (elem.msRequestFullscreen) { /* IE/Edge */
-    elem.msRequestFullscreen();
-  }
-}
-</script>
+  exp_num = "3"; //number of the experiment
+  var webSocket, dataPlot;
+  var values = [];
+  var timeStamp = [];
+  var timeMilis = [];
 
-<script>
-//Graphs visit: https://www.chartjs.org
-var values = [];
-var timeStamp = [];
-var timeMilis = [];
-
-window.chartColors = {
+  window.chartColors = {
   red: 'rgb(255, 99, 132)',
   orange: 'rgb(255, 159, 64)',
   yellow: 'rgb(255, 205, 86)',
@@ -290,24 +250,18 @@ window.chartColors = {
   purple: 'rgb(153, 102, 255)',
   grey: 'rgb(201, 203, 207)'
   };
-var config = {
+
+  var config = {
       type: 'line',
       data: {
         labels: timeStamp,
-        datasets: [{
-          label: 'Analog Values',
-          backgroundColor: window.chartColors.red,
-          borderColor: window.chartColors.red,
-          data: values,
-          fill: false,
-        }]
-      },
-      options: {
-        responsive: true,
-        title: {
-          display: false,
-          text: ''
-        },
+        datasets: [{ label: 'Analog Values',
+                     backgroundColor: window.chartColors.red,
+                     borderColor: window.chartColors.red,
+                     data: values,
+                     fill: false,}]},
+       
+       options: {responsive: true,title: {display: false, text: ''},
         tooltips: {
           mode: 'index',
           intersect: false,
@@ -335,23 +289,14 @@ var config = {
       }
     };
 
-window.onload = function() {
-      var ctx = document.getElementById('canvas').getContext('2d');
-      window.myLine = new Chart(ctx, config);
-      recording_active = false;
-      wakeUp("exp1")
-    };
 
 
-//Ajax script to get ADC voltage at every 5 Seconds 
-//Read This tutorial https://circuits4you.com/2018/02/04/esp8266-ajax-update-part-of-web-page-without-refreshing/
-
-
-function startRecording(){
+  function startRecording(){
   if(recording_active == false){
     recording_active = true;
     interval = document.getElementById("update_interval").value;
-    myTimer = setInterval(getData, interval);
+    sendDataRate();
+    // myTimer = setInterval(getData, interval);
     start_time = new Date().getTime();
   }
   else{
@@ -359,18 +304,12 @@ function startRecording(){
   }
 }
 
-function updateRecording(){
-  if(recording_active == true){
-    clearInterval(myTimer);
-    interval = document.getElementById("update_interval").value;
-    myTimer = setInterval(getData, interval);
-  }
-}
+
 
 function stopRecording(){
   if(recording_active ==true){
     recording_active = false;
-    clearInterval(myTimer);
+    sendStopSignal();
   }
   else{
     alert("No active recording!");
@@ -393,46 +332,76 @@ function downloadCSV(){
 }
 
 
-function wakeUp(var1) {
+function wakeUp() {
   var xhttp = new XMLHttpRequest();
-  xhttp.open("GET", var1, true); //Handle /stuff server on ESP8266
-  xhttp.send();
+  xhttp.open("POST", "activatedexp?exp="+exp_num, true); //pings /activatedexp
+  xhttp.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+  xhttp.onreadystatechange = function() {//Call a function when the state changes.
+  if(xhttp.readyState == 4 && http.status == 200) {alert(http.responseText);}}
+  xhttp.send(); 
 }
 
-function getData() {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-     //Push the data in array
+function init() {
+    webSocket = new WebSocket('ws://' + window.location.hostname + ':81/');
+    var ctx = document.getElementById('canvas').getContext('2d');
+    window.myLine = new Chart(ctx, config);
+    recording_active = false;
+    wakeUp()
+
+webSocket.onmessage = function(event) {
+  if (recording_active){
+  var Value = JSON.parse(event.data).value;
   var time = new Date();
-  var ADCValue = this.responseText; 
-      values.push(ADCValue);
-      timeStamp.push(time.toLocaleTimeString());
-      timeMilis.push(time.getTime() - start_time);
+  values.push(Value);
+  timeStamp.push(time.toLocaleTimeString());
+  timeMilis.push(time.getTime() - start_time);
+
   //Update Plot
   window.myLine.update();
   //Update Data Table
-    var table = document.getElementById("dataTable");
-    var row = table.insertRow(1); //Add after headings
-    var cell1 = row.insertCell(0);
-    var cell2 = row.insertCell(1);
-    cell1.innerHTML = time.toLocaleTimeString();
-    cell2.innerHTML = ADCValue;
-    }
-  };
-  xhttp.open("GET", "readADC", true); //Handle readADC server on ESP8266
-  xhttp.send();
+  // var table = document.getElementById("dataTable");
+  // var row = table.insertRow(1); //Add after headings
+  // var cell1 = row.insertCell(0);
+  // var cell2 = row.insertCell(1);
+  // cell1.innerHTML = time.toLocaleTimeString();
+  // cell2.innerHTML = ADCValue;
+  }
 }
-    
-</script>
-  
-<!-- End Page Content -->
-</div>
+};
 
-<!-- Footer -->
+
+
+function sendDataRate(){
+  var dataRate = document.getElementById("update_interval").value;
+  webSocket.send(dataRate);
+  start_time = new Date().getTime();
+  }
+
+function sendStopSignal(){
+  webSocket.send(0);
+  }
+
+ 
+var elem = document.getElementById("graph");
+function openFullscreen() {
+  if (elem.requestFullscreen) {
+    elem.requestFullscreen();
+  } else if (elem.mozRequestFullScreen) { /* Firefox */
+    elem.mozRequestFullScreen();
+  } else if (elem.webkitRequestFullscreen) { 
+    elem.webkitRequestFullscreen();
+  } else if (elem.msRequestFullscreen) { /* IE/Edge */
+    elem.msRequestFullscreen();
+  }
+}
+</script>
+
+</body>
+
 <footer class="w3-container w3-padding-64 w3-light-grey w3-center w3-large"> 
-  <p>Project by <a href="https://expertexperiments.ba" target="_blank" class="w3-hover-text-green">ExpertExperiments</a></p>
+  <p>Project by <a href="expertexperiments.pythonanywhere.com/" target="_blank" class="w3-hover-text-green">ExpertExperiments</a></p>
 </footer>
+</html>
 
 
 </body></html>
