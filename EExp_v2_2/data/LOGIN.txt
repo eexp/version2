@@ -1,0 +1,2 @@
+Eduroam,12345678
+FRITZ!Box@Klugestrasse,Ammar&SladansWifi
